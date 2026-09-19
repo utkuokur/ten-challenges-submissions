@@ -18,12 +18,17 @@ The Check.lean file asserts two things about the submission:
    which the source-level grep `(^|[^[:alnum:]_])sorry([^[:alnum:]_]|$)`
    does not match because `sorryAx` is followed by `A`).
 
+The CLI also exports the checked parameter to `.lake/verified-parameter.json`.
+CI consumes it only after a successful build, replacing the issue's claimed
+parameter before duplicate checks and leaderboard publication.
+
 Usage:
     python3 generate_check.py --problem challenge_1 --output Challenges/Check.lean
 """
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import sys
 
@@ -322,6 +327,53 @@ set_option linter.hashCommand false in
 """
 
 
+# Consumed only when the entire signature and axiom check builds successfully.
+# Natural parameters are reduced, not pretty-printed (e.g. 1 + 2 becomes 3).
+# Ordinals have no general numeric normal form: expand submission definitions
+# and retain the resulting Lean expression, e.g. Ordinal.omega0 + 1.
+PARAMETER_REPORT = r"""
+
+open Lean Meta Elab Command in
+elab "#export_verified_parameter" : command => do
+  let parameter ← liftTermElabM do
+    let r ← mkConstWithFreshMVarLevels `Submission.r
+    if (← whnf (← inferType r)).isConstOf ``Nat then
+      let some n ← getNatValue? (← withTransparency .all (whnf r))
+        | throwError "Submission.r must reduce to a concrete natural number for the leaderboard."
+      return toString n
+    else
+      let env ← getEnv
+      let value ← deltaExpand r fun name =>
+        (`Submission).isPrefixOf name || match env.getModuleIdxFor? name with
+        | some i =>
+          let moduleName := env.header.moduleNames[i]!
+          (`Submission).isPrefixOf moduleName || moduleName == `%MODULE%
+        | none => false
+      return (← withOptions (fun opts =>
+        opts.setBool `pp.fullNames true |>.setBool `pp.universes false
+          |>.set `pp.maxDepth (10000 : Nat) |>.set `pp.maxSteps (100000 : Nat))
+        (ppExpr value)).pretty
+  IO.FS.writeFile ".lake/verified-parameter.json" <|
+    (Json.mkObj [("problem_id", Json.str %PROBLEM%),
+                 ("parameter", Json.str parameter)]).compress
+
+set_option linter.hashCommand false in
+#export_verified_parameter
+"""
+
+
+def parameter_report(problem: str, submission_module: str) -> str:
+    if problem.endswith(("_univ", "_disprove")):
+        report = json.dumps({"problem_id": problem, "parameter": "universal"})
+        return '\nrun_cmd Lean.Elab.Command.liftTermElabM do\n' + (
+            '  IO.FS.writeFile ".lake/verified-parameter.json" '
+            + json.dumps(report) + '\n'
+        )
+    return PARAMETER_REPORT.replace("%MODULE%", submission_module).replace(
+        "%PROBLEM%", json.dumps(problem)
+    )
+
+
 def problem_number(problem_id: str) -> int:
     """Extract the leading numeric component of a problem id.
 
@@ -336,7 +388,7 @@ def problem_number(problem_id: str) -> int:
     return int(m.group(1))
 
 
-def render_check(problem: str, submission_module: str) -> str:
+def render_check(problem: str, submission_module: str, *, report_parameter: bool = False) -> str:
     """Assemble the complete Check.lean body for `problem`, importing the
     user's proof from `submission_module`. Raises KeyError for unknown ids.
 
@@ -356,6 +408,7 @@ def render_check(problem: str, submission_module: str) -> str:
         AXIOM_CHECK_IMPORT
         + template.lstrip("\n")
         + AXIOM_CHECK_TAIL.replace("%N%", str(n))
+        + (parameter_report(problem, submission_module) if report_parameter else "")
     )
 
 
@@ -376,7 +429,7 @@ def main() -> int:
         sys.exit(f"Unknown problem id: {args.problem!r}. "
                  f"Known: {', '.join(sorted(CHECKS))}")
 
-    body = render_check(args.problem, args.submission_module)
+    body = render_check(args.problem, args.submission_module, report_parameter=True)
     with open(args.output, "w", encoding="utf-8") as f:
         f.write(body)
     print(f"Wrote signature + axiom check for {args.problem} to "

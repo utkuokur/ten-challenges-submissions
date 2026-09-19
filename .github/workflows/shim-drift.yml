@@ -17,6 +17,9 @@ on:
     paths:
       - "scripts/generate_check.py"
       - "scripts/shim_drift_check.py"
+      - "scripts/verified_metadata.py"
+      - "tests/**"
+      - ".github/workflows/submission.yml"
       - ".github/workflows/shim-drift.yml"
   workflow_dispatch:
   schedule:
@@ -40,6 +43,9 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Test verified submission metadata
+        run: python3 -m unittest discover -s tests -v
+
       - uses: actions/checkout@v4
         with:
           repository: TenChallenges/ten-challenges
@@ -61,3 +67,6 @@ jobs:
 
       - name: Check every shim against the canon
         run: python3 scripts/shim_drift_check.py --project lean-challenge
+
+      - name: Check proof-derived leaderboard parameters
+        run: python3 tests/integration_verified_parameter.py --project lean-challenge

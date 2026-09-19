@@ -56,6 +56,7 @@ jobs:
       size_within_cap: ${{ steps.size_status.outputs.within_cap }}
       audit_ciphertext_ready: ${{ steps.audit_status.outputs.ready }}
       build_succeeded: ${{ steps.build.outputs.ok }}
+      metadata_ready: ${{ steps.verified_metadata.outcome == 'success' && steps.upload_metadata.outcome == 'success' }}
     steps:
       # ───────────────────────────────────────────────────────────────
       # 0. Checkouts (persist-credentials:false on BOTH — see header)
@@ -176,36 +177,6 @@ jobs:
           app-id: ${{ secrets.LEAN_CHALLENGE_BOT_APP_ID }}
           private-key: ${{ secrets.LEAN_CHALLENGE_BOT_PRIVATE_KEY }}
           owner: ${{ steps.owner.outputs.owner }}
-
-      # ───────────────────────────────────────────────────────────────
-      # 1c. Reject duplicate (problem, r) submissions  (unchanged)
-      # ───────────────────────────────────────────────────────────────
-      - name: Reject duplicate (problem, r)
-        id: dup
-        env:
-          PROBLEM_ID: ${{ steps.parse.outputs.problem_id }}
-          PARAMETER: ${{ steps.parse.outputs.parameter }}
-        run: |
-          DUPE=$(python3 - <<'PY'
-          import json, os, pathlib, sys
-          p = pathlib.Path("site-data/leaderboard.json")
-          if not p.exists() or p.stat().st_size == 0:
-              sys.exit(0)
-          data = json.loads(p.read_text(encoding="utf-8"))
-          problem_id = os.environ["PROBLEM_ID"]
-          parameter = os.environ["PARAMETER"]
-          for e in data.get("entries", []):
-              if e.get("problem") == problem_id \
-                 and e.get("parameter") == parameter:
-                  print(f"issue #{e.get('issue', '?')} by "
-                        f"{e.get('nickname', '?')}")
-                  break
-          PY
-          )
-          if [ -n "$DUPE" ]; then
-            echo "FETCH_ERROR=Challenge \`$PROBLEM_ID\` at r = \`$PARAMETER\` has already been settled ($DUPE). Pick a different r." >> "$GITHUB_ENV"
-            exit 1
-          fi
 
       # ───────────────────────────────────────────────────────────────
       # 2. Fetch submission. Produces:
@@ -368,15 +339,6 @@ jobs:
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Upload submission metadata (for record)
-        if: steps.encrypt.outcome == 'success'
-        uses: actions/upload-artifact@v4
-        with:
-          name: submission-metadata
-          path: /tmp/fetch-out/metadata.json
-          if-no-files-found: error
-          retention-days: 7
-
       # ───────────────────────────────────────────────────────────────
       # 4. Strip git state, then run the verifier: wrap → signature-shim
       #    Check.lean → build. The build is SPLIT for the sandbox:
@@ -453,6 +415,7 @@ jobs:
         # that the offline compile succeeds. See docs/security-model.md.
         run: |
           set +e
+          rm -f .lake/verified-parameter.json
           if bwrap --unshare-net --dev-bind / / true 2>/dev/null; then
             echo "sandbox: bubblewrap network isolation engaged"
             bwrap --unshare-net --dev-bind / / --die-with-parent --chdir "$PWD" \
@@ -468,6 +431,28 @@ jobs:
           else
             echo "ok=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Resolve the proved parameter and check duplicates
+        id: verified_metadata
+        if: steps.build.outputs.ok == 'true'
+        run: |
+          if ! MSG=$(python3 scripts/verified_metadata.py \
+              --metadata /tmp/fetch-out/metadata.json \
+              --report lean-challenge/.lake/verified-parameter.json \
+              --leaderboard site-data/leaderboard.json 2>&1); then
+            echo "FETCH_ERROR=${MSG#ERROR: }" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+      - name: Upload verified submission metadata (for record)
+        id: upload_metadata
+        if: steps.verified_metadata.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: submission-metadata
+          path: /tmp/fetch-out/metadata.json
+          if-no-files-found: error
+          retention-days: 7
 
       # ───────────────────────────────────────────────────────────────
       # 5. In-job rejection comments. NOTE: we deliberately do NOT echo
@@ -533,6 +518,27 @@ jobs:
           name: submission-audit-ciphertext
           path: /tmp/audit-in
 
+      - name: Download verified parameter metadata
+        if: needs.evaluate.outputs.metadata_ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: submission-metadata
+          path: /tmp/verified-meta
+
+      - name: Attach the verified parameter to the audit record
+        if: needs.evaluate.outputs.metadata_ready == 'true'
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          metadata = json.loads(Path('/tmp/verified-meta/metadata.json').read_text())
+          path = Path('/tmp/audit-in/sidecar.partial.json')
+          sidecar = json.loads(path.read_text())
+          sidecar['claimed_parameter'] = sidecar['parameter']
+          sidecar['parameter'] = metadata['parameter']
+          path.write_text(json.dumps(sidecar, indent=2) + '\n')
+          PY
+
       - name: Mint ten-challenges-archiver installation token
         id: archiver_token
         uses: actions/create-github-app-token@v1
@@ -569,6 +575,7 @@ jobs:
     if: |
       always()
       && needs.evaluate.outputs.build_succeeded == 'true'
+      && needs.evaluate.outputs.metadata_ready == 'true'
       && needs.archive.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -654,6 +661,7 @@ jobs:
     if: |
       always()
       && needs.evaluate.outputs.build_succeeded == 'true'
+      && needs.evaluate.outputs.metadata_ready == 'true'
       && (needs.archive.result != 'success' || needs.record.result != 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 5
