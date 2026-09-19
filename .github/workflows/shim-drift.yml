@@ -74,3 +74,6 @@ jobs:
 
       - name: Check proof-derived leaderboard parameters
         run: python3 tests/integration_verified_parameter.py --project lean-challenge
+
+      - name: Smoke-test accepted and rejected submissions
+        run: python3 tests/integration_submission_smoke.py --project lean-challenge
