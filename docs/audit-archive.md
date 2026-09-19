@@ -33,6 +33,11 @@ makes the path unique; `{problem}` and `{param}` are appended for
 human-readability. The tarball is the same `source.tar.gz` the evaluator
 saw: the evaluated `Submission/` tree from the submitted repo.
 
+For submissions made under the [maintenance policy](maintenance-policy.md), the
+sidecar also records the checked compatibility permission, its policy version,
+and the GitHub issue author. Older records without that permission are not
+automatically authorized for maintenance.
+
 Encryption uses [`age`](https://github.com/FiloSottile/age) with the
 recipients in [`.audit/recipients.txt`](../.audit/recipients.txt). The
 sidecar records the SHA-256 of both the plaintext tar and the ciphertext

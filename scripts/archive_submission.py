@@ -236,6 +236,8 @@ def _encrypt(args: argparse.Namespace) -> int:
         "size_bytes_plaintext_tar": size_bytes,
         "sha256_plaintext_tar": plaintext_sha,
     }
+    if "maintenance_consent" in metadata:
+        sidecar["maintenance_consent"] = _require_type(metadata, "maintenance_consent", dict)
     name = metadata.get("name")
     if name:
         if not isinstance(name, str):

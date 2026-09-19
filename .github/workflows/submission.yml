@@ -81,11 +81,19 @@ jobs:
         id: parse
         env:
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
         run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import os, re, sys
+          import json, os, re, sys
+          from scripts.maintenance_consent import read_consent
 
           body = os.environ.get("ISSUE_BODY", "")
+          try:
+              consent = read_consent(body, os.environ["ISSUE_AUTHOR"])
+          except ValueError as exc:
+              with open(os.environ["GITHUB_ENV"], "a") as f:
+                  f.write(f"FETCH_ERROR={exc}\n")
+              sys.exit(str(exc))
 
           def extract(label: str, required: bool = True) -> str:
               pat = rf"^###\s+{re.escape(label)}\s*\n+(?P<v>.+?)(?=\n+###\s|\Z)"
@@ -140,7 +148,7 @@ jobs:
                     "problem_id": problem_id,
                     "module": module, "claim": claim,
                     "parameter": parameter, "nickname": nickname,
-                    "name": name}
+                    "name": name, "maintenance_consent": json.dumps(consent)}
           for k, v in single.items():
               v_one = v.replace("\n", " ").replace("\r", "").strip()
               print(f"{k}={v_one}")
@@ -202,6 +210,7 @@ jobs:
           NICKNAME: ${{ steps.parse.outputs.nickname }}
           NAME: ${{ steps.parse.outputs.name }}
           MODULE: ${{ steps.parse.outputs.module }}
+          MAINTENANCE_CONSENT: ${{ steps.parse.outputs.maintenance_consent }}
         run: |
           set -e
           mkdir -p /tmp/fetch-out

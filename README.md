@@ -44,6 +44,10 @@ build log stays in the maintainer-visible workflow run, not in the
 issue). On success, an entry is appended to `site-data/leaderboard.json`
 — **your proof source itself is never published** (see below).
 
+The submission forms also request permission for future compatibility edits.
+See the [maintenance policy](docs/maintenance-policy.md) for its scope and the
+procedure for Lean and library upgrades.
+
 ## Keeping your proof private
 
 You can keep your proof source hidden from other contestants while still

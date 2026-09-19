@@ -7,6 +7,7 @@ Usage:
 Reads ISSUE, PROBLEM_ID, PARAMETER, CLAIM, NICKNAME, NAME, MODULE,
 REPO_URL, REPO_REF, SUBMISSION_KIND, SUBMISSION_REPO, SUBMISSION_REF,
 SUBMISSION_PUBLIC from the environment and serializes them to JSON.
+MAINTENANCE_CONSENT optionally contains the captured permission as JSON.
 Reading from the environment (rather than `${{ }}` interpolation
 into the workflow script) and serializing with json.dumps keeps
 user-controlled fields escaped, not injected.
@@ -44,6 +45,8 @@ def main(argv):
         "submission_public": os.environ["SUBMISSION_PUBLIC"] == "true",
         "source_url": src,
     }
+    if consent := os.environ.get("MAINTENANCE_CONSENT"):
+        data["maintenance_consent"] = json.loads(consent)
     with open(out_path, "w", encoding="utf-8") as fh:
         json.dump(data, fh, indent=2)
         fh.write("\n")

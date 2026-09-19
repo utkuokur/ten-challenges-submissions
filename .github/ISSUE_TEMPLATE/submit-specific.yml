@@ -90,5 +90,7 @@ body:
           required: true
         - label: I understand my nickname, name, problem, claim, and parameter will be published on the public leaderboard (but not my proof source).
           required: true
-        - label: I understand that an encrypted copy of my submission source is retained indefinitely in a private audit repository, decryptable only by the maintainers listed in `.audit/recipients.txt`, for soundness auditing.
+        - label: I understand that an encrypted copy of my submission source is retained indefinitely in a private audit repository, decryptable only by the maintainers listed in `.audit/recipients.txt`, for soundness auditing and compatibility maintenance.
+          required: true
+        - label: I have the necessary rights to authorize the competition maintainers to retain and modify copies of my submission solely for compatibility with future Lean and library versions, preserving authorship, the mathematical claim, and its public or private status.
           required: true
