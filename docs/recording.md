@@ -35,8 +35,10 @@ and recording order breaking ties. Unsupported ordinal values appear in a
 separate unranked group, in recording order; placing them there does not assert
 that they are smaller. Displayed ranks are positions within the ranked group
 of that tab; the stored recording ranks remain unchanged.
-The challenge summary shows the largest proved ordinal only if every entry
-has a supported comparison key.
+The ordinal challenge summaries show “latest r”: the most recently recorded
+proved parameter, whether or not it has a supported comparison key. A universal
+proof is displayed as “all r”. Natural-number summaries show the largest proved
+parameter.
 
 Other ordinals remain accepted and retain their Lean expression for manual
 comparison. Resource limits also fall back to that display: expression and
