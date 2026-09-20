@@ -78,11 +78,5 @@ body:
     attributes:
       label: Acknowledgements
       options:
-        - label: I understand the CI will shallow-clone the repository above and run `lake build` against the canonical environment.
-          required: true
-        - label: I understand my nickname, name, problem, claim, and parameter will be published on the public leaderboard
-          required: true
-        - label: I understand that an encrypted copy of my submission source is retained indefinitely in a private audit repository, decryptable only by the maintainers listed in `.audit/recipients.txt`, for soundness auditing and compatibility maintenance.
-          required: true
-        - label: I have the necessary rights to authorize the competition maintainers to retain and modify copies of my submission solely for compatibility with future Lean and library versions, preserving authorship, the mathematical claim, and its public or private status.
+        - label: I understand the CI will shallow-clone the repository above and run `lake build`. I understand my nickname, name, problem, claim, and parameter will be published on the public leaderboard. I understand that an encrypted copy of my submission source is retained indefinitely in a private audit repository, decryptable only by the maintainers, for soundness auditing and compatibility maintenance. I authorize the competition maintainers to retain and modify copies of my submission solely for compatibility with future Lean and library versions, preserving authorship, the mathematical claim, and its public or private status.
           required: true

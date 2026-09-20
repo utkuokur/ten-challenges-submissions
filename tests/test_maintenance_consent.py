@@ -12,22 +12,22 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 import archive_submission
-from maintenance_consent import CONSENT_TEXT, POLICY_VERSION, read_consent
+from maintenance_consent import ACKNOWLEDGEMENTS_TEXT, CONSENT_TEXT, POLICY_VERSION, read_consent
 import write_metadata
 
 
 class MaintenanceConsentTests(unittest.TestCase):
     def test_checked_permission_records_exact_terms_and_author(self):
         for marker in ("x", "X"):
-            body = f"### Acknowledgements\n\n- [{marker}] {CONSENT_TEXT}\n"
+            body = f"### Acknowledgements\n\n- [{marker}] {ACKNOWLEDGEMENTS_TEXT}\n"
             self.assertEqual(read_consent(body, "submitter"), {
                 "policy_version": POLICY_VERSION, "permission": CONSENT_TEXT,
                 "issue_author": "submitter",
             })
 
     def test_missing_unchecked_or_changed_permission_is_rejected(self):
-        for body in ("", f"### Acknowledgements\n- [ ] {CONSENT_TEXT}",
-                     f"### Other field\n- [x] {CONSENT_TEXT}",
+        for body in (f"### Acknowledgements\n- [x] {CONSENT_TEXT}", "", f"### Acknowledgements\n- [ ] {ACKNOWLEDGEMENTS_TEXT}",
+                     f"### Other field\n- [x] {ACKNOWLEDGEMENTS_TEXT}",
                      "### Acknowledgements\n- [x] I authorize publication of my proof."):
             with self.subTest(body=body), self.assertRaises(ValueError):
                 read_consent(body, "submitter")
@@ -35,11 +35,12 @@ class MaintenanceConsentTests(unittest.TestCase):
     def test_both_forms_require_the_terms_the_parser_recognizes(self):
         for name in ("submit-specific.yml", "submit-universal.yml"):
             text = (ROOT / ".github/ISSUE_TEMPLATE" / name).read_text()
-            self.assertIn(f"- label: {CONSENT_TEXT}\n          required: true", text)
+            self.assertEqual(text.split("    id: acknowledgements\n", 1)[1].count("- label:"), 1)
+            self.assertIn(f"- label: {ACKNOWLEDGEMENTS_TEXT}\n          required: true", text)
         self.assertIn(CONSENT_TEXT, (ROOT / "docs/maintenance-policy.md").read_text())
 
     def test_consent_survives_metadata_and_archive(self):
-        consent = read_consent(f"### Acknowledgements\n- [x] {CONSENT_TEXT}", "submitter")
+        consent = read_consent(f"### Acknowledgements\n- [x] {ACKNOWLEDGEMENTS_TEXT}", "submitter")
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             metadata = root / "metadata.json"

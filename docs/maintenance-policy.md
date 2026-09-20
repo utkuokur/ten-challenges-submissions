@@ -1,10 +1,10 @@
 # Proof compatibility maintenance
 
-Policy version: 2026-09-20.
+Policy version: 2026-09-21.
 
 The submission form asks you to confirm:
 
-> I have the necessary rights to authorize the competition maintainers to retain and modify copies of my submission solely for compatibility with future Lean and library versions, preserving authorship, the mathematical claim, and its public or private status.
+> I authorize the competition maintainers to retain and modify copies of my submission solely for compatibility with future Lean and library versions, preserving authorship, the mathematical claim, and its public or private status.
 
 This permission covers compatibility changes such as updated imports, renamed
 lemmas, and adapted proof scripts. It does not transfer ownership or authorize
