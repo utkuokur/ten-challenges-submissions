@@ -6,6 +6,8 @@ import argparse
 import json
 from pathlib import Path
 
+from ordinal_parameters import display_cnf, parse_cnf
+
 
 def resolve_metadata(metadata: dict, report: dict, leaderboard: dict) -> dict:
     problem = metadata["problem_id"]
@@ -24,13 +26,23 @@ def resolve_metadata(metadata: dict, report: dict, leaderboard: dict) -> dict:
         parameter = parameter.lstrip("0") or "0"
     elif parameter == "universal":
         raise ValueError("Expected an ordinal parameter.")
+    ordinal_fields = {}
+    if problem in ("challenge_6", "challenge_10") and "ordinal_cnf" in report:
+        normal = parse_cnf(report["ordinal_cnf"])
+        if display_cnf(normal) != parameter:
+            raise ValueError("The ordinal display does not match its normal form.")
+        ordinal_fields["ordinal_cnf"] = report["ordinal_cnf"]
     for entry in leaderboard.get("entries", []):
         if entry.get("problem") == problem and entry.get("parameter") == parameter:
             raise ValueError(
                 f"Challenge {problem} at r = {parameter} has already been settled "
                 f"by issue #{entry.get('issue', '?')}."
             )
-    return {**metadata, "claimed_parameter": metadata["parameter"], "parameter": parameter}
+    result = {**metadata, "claimed_parameter": metadata["parameter"], "parameter": parameter}
+    # Only the checked report can supply a comparison key. Do not retain a
+    # claimed/stale key from the issue metadata when normalization is absent.
+    result.pop("ordinal_cnf", None)
+    return {**result, **ordinal_fields}
 
 
 def main() -> None:

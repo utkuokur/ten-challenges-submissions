@@ -65,7 +65,7 @@ appearing on the leaderboard:
 
 If CI replies *"Could not clone the (private) repo …"*, the App isn't
 installed on (or granted access to) that repo. Fix the access above and
-**re-open the issue** to retry. Public repos don't need the App at all — CI
+**open a new submission issue**. Public repos don't need the App at all — CI
 clones them anonymously.
 
 What is and isn't visible:
@@ -83,8 +83,13 @@ What is and isn't visible:
 
 Once any submission has settled a given (problem, r) pair, later
 submissions for the same pair are rejected — both directions are
-mathematically closed at that point. (Two submissions for the same `r`
-arriving within minutes of each other can both land; we credit ties.)
+mathematically closed at that point. Results are recorded in issue-opening
+order. Each challenge tab displays larger natural numbers or recognized
+ordinals first; other ordinals remain unranked pending comparison. The overall
+list retains recording order.
+If recording fails, the issue is closed; check the leaderboard and
+open a new issue if your result is missing. Reopening an old issue does not
+start another evaluation.
 
 AI-assisted, human, or hybrid proofs are all fine — we don't ask how
 the proof was produced.
@@ -101,7 +106,8 @@ the proof was produced.
     submit-specific.yml    # specific-r submission form
     submit-universal.yml   # universal (∀r) submission form
   workflows/
-    submission.yml         # evaluate → archive → record → notify
+    submission.yml         # evaluate → archive
+    record.yml             # record completed results in issue-opening order
     validate-recipients.yml # lints .audit/recipients.txt
 docs/
   audit-archive.md         # encrypted-archive design + decryption
@@ -109,6 +115,8 @@ docs/
   security-model.md        # confidentiality / threat model
 scripts/
   append_leaderboard.py    # appends one entry to site-data/leaderboard.json
+  record_leaderboard.py    # one save attempt against the current leaderboard
+  record_queue.py          # ordered recording and issue outcomes
   archive_submission.py    # age-encrypts source + pushes to the private audit repo
   generate_check.py        # per-problem signature + axiom shim
 site-data/

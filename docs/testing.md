@@ -6,6 +6,7 @@ Run against a checkout of the canonical challenge repository:
 python3 -m unittest discover -s tests -v
 python3 scripts/shim_drift_check.py --project ../ten-challenges
 python3 tests/integration_verified_parameter.py --project ../ten-challenges
+python3 tests/integration_ordinal_parameters.py --project ../ten-challenges
 python3 tests/integration_submission_smoke.py --project ../ten-challenges
 ```
 
@@ -35,3 +36,16 @@ The suite also checks that the real leaderboard bytes remain unchanged.
 Use `--cases NAME ...` on the smoke script to rerun selected cases.
 
 Both repositories' shim-drift workflows run the smoke suite automatically.
+
+The Python unit suite also checks submission ordering, duplicate rejection,
+one-attempt recording failures, and recovery of interrupted notifications.
+These tests use fake GitHub responses and temporary local Git repositories;
+they do not alter the real leaderboard or create issues. The recording policy
+is described in [recording.md](recording.md).
+
+The ordinal integration suite compiles real Lean expressions using Mathlib's
+normal ordinal notation. It checks addition, multiplication, natural and ordinal
+powers, nested powers, exact large coefficients, aliases, noncommutativity, and
+duplicate detection. Unrecognized expressions and customized arithmetic must
+not acquire an automatic comparison key. The website's `npm run test:ordinals`
+checks normal-form ordering and its fallback for unsupported expressions.

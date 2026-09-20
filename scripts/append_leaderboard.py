@@ -16,8 +16,8 @@ Schema matches what the React app at automated_compile/src/App.tsx reads:
           "submission_public": bool }, # whether the source was public at eval time
         ... ] }
 
-Rank is assigned as `len(existing_entries) + 1` — i.e. monotonically
-increasing in submission order. The React app re-sorts for display.
+Rank follows the largest existing rank. Repeated recording of the same
+issue/result is a no-op; a competing issue cannot take an occupied place.
 """
 from __future__ import annotations
 
@@ -26,6 +26,53 @@ import datetime as dt
 import json
 import pathlib
 import sys
+from dataclasses import dataclass
+
+from ordinal_parameters import display_cnf, parse_cnf
+
+
+@dataclass(frozen=True)
+class Decision:
+    status: str  # added, existing, duplicate, or conflict
+    entry: dict
+
+
+def decide(data: dict, metadata: dict) -> Decision:
+    """Inspect the latest board without changing it."""
+    entries = data["entries"]
+    if not isinstance(entries, list):
+        raise ValueError("Malformed leaderboard: entries must be a list")
+    key = (metadata["problem_id"], metadata["parameter"])
+    for entry in entries:
+        if entry["issue"] == metadata["issue"]:
+            same = (entry["problem"], entry["parameter"]) == key
+            same = same and entry["claim"] == metadata["claim"]
+            return Decision("existing" if same else "conflict", entry)
+    for entry in entries:
+        if (entry["problem"], entry["parameter"]) == key:
+            return Decision("duplicate", entry)
+    public = metadata["submission_public"]
+    if not isinstance(public, bool):
+        raise ValueError("submission_public must be a boolean")
+    ordinal_fields = {}
+    if metadata["problem_id"] in ("challenge_6", "challenge_10") and "ordinal_cnf" in metadata:
+        if display_cnf(parse_cnf(metadata["ordinal_cnf"])) != metadata["parameter"]:
+            raise ValueError("Ordinal parameter and normal form disagree")
+        ordinal_fields["ordinal_cnf"] = metadata["ordinal_cnf"]
+    return Decision("added", {
+        "rank": max((entry["rank"] for entry in entries), default=0) + 1,
+        "nickname": metadata["nickname"],
+        "name": metadata.get("name", ""),
+        "problem": metadata["problem_id"],
+        "claim": metadata["claim"],
+        "parameter": metadata["parameter"],
+        "date": dt.datetime.now(tz=dt.timezone.utc)
+                  .replace(microsecond=0).isoformat().replace("+00:00", "Z"),
+        "issue": metadata["issue"],
+        "source_url": metadata.get("source_url", "") if public else "",
+        "submission_public": public,
+        **ordinal_fields,
+    })
 
 
 def main() -> int:
@@ -56,22 +103,24 @@ def main() -> int:
         data = {"entries": []}
         path.parent.mkdir(parents=True, exist_ok=True)
 
-    entry = {
-        "rank": len(data["entries"]) + 1,
+    metadata = {
         "nickname": args.nickname,
         "name": args.name,
-        "problem": args.problem,
+        "problem_id": args.problem,
         "claim": args.claim,
         "parameter": args.parameter,
-        "date": dt.datetime.now(tz=dt.timezone.utc)
-                  .replace(microsecond=0).isoformat()
-                  .replace("+00:00", "Z"),
         "issue": args.issue,
-        # For a private submission the source is not published, so the
-        # link is empty; the UI should render no source link in that case.
-        "source_url": args.source_url if args.submission_public else "",
-        "submission_public": bool(args.submission_public),
+        "source_url": args.source_url,
+        "submission_public": args.submission_public,
     }
+    decision = decide(data, metadata)
+    if decision.status == "existing":
+        print(f"Issue #{args.issue} is already recorded")
+        return 0
+    if decision.status != "added":
+        print(f"Not added: {decision.status}, issue #{decision.entry['issue']}")
+        return 1
+    entry = decision.entry
     data["entries"].append(entry)
 
     path.write_text(

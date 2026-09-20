@@ -1,0 +1,41 @@
+name: Record submissions
+
+on:
+  workflow_run:
+    workflows: [Evaluate submission]
+    types: [completed]
+  issues:
+    types: [closed, reopened]
+  workflow_dispatch:
+
+# Each invocation drains all ready issues, rather than just its triggering
+# run. Replacing a pending wake-up therefore cannot lose a queued submission.
+concurrency:
+  group: submission-recording
+  cancel-in-progress: false
+
+permissions:
+  actions: read
+  contents: write
+  issues: write
+
+jobs:
+  record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      # Always trusted default-branch code, never the submitted repository or
+      # the triggering run's head SHA. Only verified JSON is downloaded.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Configure recorder identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Record ready submissions in opening order
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 scripts/record_queue.py

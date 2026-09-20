@@ -1,6 +1,7 @@
 name: Evaluate submission
+run-name: 'Submission #${{ github.event.issue.number }}'
 
-# Triggered when a submission issue is opened/labeled/reopened. The
+# Triggered when a submission issue is opened. The
 # `evaluate` job parses the issue body, fetches the user's submission
 # (a single .lean file at a public raw URL, or a — possibly PRIVATE —
 # GitHub repo cloned with the `ten-challenges-bot` App token), runs the
@@ -27,7 +28,7 @@ name: Evaluate submission
 
 on:
   issues:
-    types: [opened, labeled, reopened]
+    types: [opened]
 
 concurrency:
   group: submission-issue-${{ github.event.issue.number }}
@@ -38,17 +39,13 @@ jobs:
     if: |
       github.event.issue.state == 'open'
       && contains(github.event.issue.body, '### Problem')
-      && (
-        github.event.action == 'opened'
-        || github.event.action == 'reopened'
-        || (github.event.action == 'labeled' && github.event.label.name == 'submission')
-      )
+      && github.event.action == 'opened'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     permissions:
-      # Read only: the leaderboard write happens in the `record` job. This
-      # job runs untrusted Lean, so it holds the minimum it needs (issue
-      # comments for inline rejections).
+      # Leaderboard writes happen in the separate Record submissions workflow.
+      # This job runs untrusted Lean, so it holds the minimum it needs
+      # (read access and issue comments for inline rejections).
       contents: read
       issues: write
     outputs:
@@ -232,7 +229,7 @@ jobs:
           fi
           if ! git clone --depth 1 --branch "$REPO_REF" "$CLONE_URL" /tmp/user-repo 2>/dev/null; then
             if [ "$SUBMISSION_PUBLIC" != "true" ]; then
-              echo "FETCH_ERROR=Could not clone the (private) repo \`$REPO_URL\`. Install the \`ten-challenges-bot\` GitHub App on it (link in the README) so CI can read it, then re-open this issue." >> "$GITHUB_ENV"
+              echo "FETCH_ERROR=Could not clone the (private) repo \`$REPO_URL\`. Install the \`ten-challenges-bot\` GitHub App on it (link in the README) so CI can read it, then open a new submission issue." >> "$GITHUB_ENV"
             else
               echo "FETCH_ERROR=Could not clone \`$REPO_URL\`. Check the URL and that it has a \`main\` branch." >> "$GITHUB_ENV"
             fi
@@ -330,7 +327,7 @@ jobs:
         if: steps.encrypt.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: submission-audit-ciphertext
+          name: submission-audit-ciphertext-${{ github.run_attempt }}
           path: |
             /tmp/audit-encrypt/source.tar.gz.age
             /tmp/audit-encrypt/sidecar.partial.json
@@ -393,6 +390,10 @@ jobs:
           set +e
           lake exe cache get || true
           lake build Challenges.${{ steps.parse.outputs.module }} || true
+          if [ "${{ steps.parse.outputs.problem_id }}" = "challenge_6" ] \
+            || [ "${{ steps.parse.outputs.problem_id }}" = "challenge_10" ]; then
+            lake build Mathlib.SetTheory.Ordinal.Notation || exit 1
+          fi
 
       - name: Install bubblewrap (build sandbox)
         if: steps.encrypt.outcome == 'success'
@@ -416,7 +417,8 @@ jobs:
         # back to a non-isolated build with a warning rather than failing
         # every submission. The build's own exit code goes into `ok` (the
         # step never hard-fails) so the audit `archive` job still runs for a
-        # non-compiling submission; `record` is gated on ok == 'true'.
+        # non-compiling submission. The recorder requires successful evaluation,
+        # archival, and a verified metadata artifact from this run attempt.
         #
         # NOTE: whether bubblewrap can unshare a network namespace is a
         # property of the CI runner, not the build — confirm on a real CI
@@ -458,7 +460,7 @@ jobs:
         if: steps.verified_metadata.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: submission-metadata
+          name: submission-metadata-${{ github.run_attempt }}
           path: /tmp/fetch-out/metadata.json
           if-no-files-found: error
           retention-days: 7
@@ -524,14 +526,14 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          name: submission-audit-ciphertext
+          name: submission-audit-ciphertext-${{ github.run_attempt }}
           path: /tmp/audit-in
 
       - name: Download verified parameter metadata
         if: needs.evaluate.outputs.metadata_ready == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: submission-metadata
+          name: submission-metadata-${{ github.run_attempt }}
           path: /tmp/verified-meta
 
       - name: Attach the verified parameter to the audit record
@@ -574,119 +576,5 @@ jobs:
             --verdict "$VERDICT" \
             --workflow-run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-  # ─────────────────────────────────────────────────────────────────────
-  # record: append to the public leaderboard. Gated on `archive` so a
-  # leaderboard entry always implies a durable encrypted archive of the
-  # source. Only runs when the build passed.
-  # ─────────────────────────────────────────────────────────────────────
-  record:
-    needs: [evaluate, archive]
-    if: |
-      always()
-      && needs.evaluate.outputs.build_succeeded == 'true'
-      && needs.evaluate.outputs.metadata_ready == 'true'
-      && needs.archive.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: write
-      issues: write
-    steps:
-      - uses: actions/checkout@v4
-        # Default token; this repo has no branch protection, so the
-        # GITHUB_TOKEN push to main is sufficient (no recorder App needed).
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: submission-metadata
-          path: /tmp/meta
-
-      - name: Append to leaderboard and push
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          M=/tmp/meta/metadata.json
-          NICK=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['nickname'])" "$M")
-          NAME=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['name'])" "$M")
-          PROBLEM=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['problem_id'])" "$M")
-          CLAIM=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['claim'])" "$M")
-          PARAM=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['parameter'])" "$M")
-          PUBLIC=$(python3 -c "import json,sys;print(str(json.load(open(sys.argv[1]))['submission_public']).lower())" "$M")
-          SRC=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1])).get('source_url') or '')" "$M")
-
-          # Only publish the source link for PUBLIC submissions; private
-          # ones land on the leaderboard with no recoverable source link.
-          if [ "$PUBLIC" = "true" ]; then
-            PUBLIC_FLAG="--submission-public"; SRC_ARG=(--source-url "$SRC")
-          else
-            PUBLIC_FLAG="--no-submission-public"; SRC_ARG=()
-          fi
-
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          for attempt in 1 2 3 4 5; do
-            git fetch origin main && git reset --hard origin/main
-            python3 scripts/append_leaderboard.py \
-              --leaderboard site-data/leaderboard.json \
-              --nickname "$NICK" --name "$NAME" \
-              --problem "$PROBLEM" --claim "$CLAIM" --parameter "$PARAM" \
-              --issue "${{ github.event.issue.number }}" \
-              $PUBLIC_FLAG "${SRC_ARG[@]}"
-            git add site-data/leaderboard.json
-            git commit -m "leaderboard: issue #${{ github.event.issue.number }}" || true
-            if git push origin HEAD:main; then
-              break
-            fi
-            echo "push attempt ${attempt} failed; retrying"
-            sleep $((attempt * 2))
-          done
-
-      - name: Comment success and close
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          M=/tmp/meta/metadata.json
-          PROBLEM=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['problem_id'])" "$M")
-          MODULE=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['module'])" "$M")
-          gh issue comment ${{ github.event.issue.number }} \
-            --repo "${{ github.repository }}" \
-            --body "✅ Build succeeded — added to the leaderboard.
-
-          - Problem: \`${PROBLEM}\`
-          - Module built: \`Challenges.${MODULE}\`
-          - An encrypted copy of your submission was archived for audit; your source was not published."
-          gh issue close ${{ github.event.issue.number }} \
-            --repo "${{ github.repository }}" --reason completed
-
-  # ─────────────────────────────────────────────────────────────────────
-  # notify: surface INFRASTRUCTURE failures only — the build passed but
-  # archive or record did not complete. Build failures and all evaluate-
-  # stage rejections are already commented inside the evaluate job, so
-  # this never double-comments them.
-  # ─────────────────────────────────────────────────────────────────────
-  notify:
-    needs: [evaluate, archive, record]
-    if: |
-      always()
-      && needs.evaluate.outputs.build_succeeded == 'true'
-      && needs.evaluate.outputs.metadata_ready == 'true'
-      && (needs.archive.result != 'success' || needs.record.result != 'success')
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    permissions:
-      issues: write
-    steps:
-      - name: Comment on infrastructure failure
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          ARCHIVE_RESULT: ${{ needs.archive.result }}
-          RECORD_RESULT: ${{ needs.record.result }}
-        run: |
-          if [ "$ARCHIVE_RESULT" != "success" ]; then
-            BODY="⚠️ Your proof compiled, but the audit-archive step did not complete (archive job: $ARCHIVE_RESULT), so the leaderboard was not updated. A maintainer will investigate. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          else
-            BODY="⚠️ Your proof compiled and was archived, but recording it to the leaderboard did not complete (record job: $RECORD_RESULT). A maintainer will investigate. Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-          fi
-          gh issue comment ${{ github.event.issue.number }} \
-            --repo "${{ github.repository }}" --body "$BODY"
+  # Record submissions drains completed evaluations in issue-opening order.
+  # It checks that both evaluate and archive succeeded before saving a result.

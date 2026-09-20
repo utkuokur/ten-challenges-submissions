@@ -36,6 +36,8 @@ import json
 import re
 import sys
 
+from ordinal_report import ORDINAL_PARAMETER_REPORT
+
 
 # Per-problem check templates. Each maps from problem_id (as it appears in
 # the issue dropdown / GitHub issue) to a complete Lean file. The check
@@ -382,8 +384,8 @@ set_option linter.hashCommand false in
 
 # Consumed only when the entire signature, axiom, and data check succeeds.
 # Natural parameters are reduced, not pretty-printed (e.g. 1 + 2 becomes 3).
-# Ordinals have no general numeric normal form: expand submission definitions
-# and retain the resulting Lean expression, e.g. Ordinal.omega0 + 1.
+# Challenges 6 and 10 use the separate standard-ordinal reporter. The generic
+# fallback below only prints a non-natural parameter without interpreting it.
 PARAMETER_REPORT = r"""
 
 open Lean Meta Elab Command in
@@ -422,7 +424,8 @@ def parameter_report(problem: str, submission_module: str) -> str:
             '  IO.FS.writeFile ".lake/verified-parameter.json" '
             + json.dumps(report) + '\n'
         )
-    return PARAMETER_REPORT.replace("%MODULE%", submission_module).replace(
+    template = ORDINAL_PARAMETER_REPORT if problem in ("challenge_6", "challenge_10") else PARAMETER_REPORT
+    return template.replace("%MODULE%", submission_module).replace(
         "%PROBLEM%", json.dumps(problem)
     )
 
@@ -459,6 +462,8 @@ def render_check(problem: str, submission_module: str, *, report_parameter: bool
     n = problem_number(problem)
     return (
         AXIOM_CHECK_IMPORT
+        + ("import Mathlib.SetTheory.Ordinal.Notation\n"
+           if report_parameter and problem in ("challenge_6", "challenge_10") else "")
         + template.lstrip("\n")
         + AXIOM_CHECK_TAIL.replace("%N%", str(n))
         + (MATROID_DATA_CHECK if problem == "challenge_2" else "")

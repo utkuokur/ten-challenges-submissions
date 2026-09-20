@@ -144,7 +144,10 @@ def run_case(project: Path, root: Path, case: Case, lean_path: str) -> None:
         return
     assert proc.returncode == 0, output
     checked = json.loads(report.read_text())
-    assert checked == {"problem_id": case.problem, "parameter": case.parameter}, checked
+    assert checked["problem_id"] == case.problem and checked["parameter"] == case.parameter, checked
+    assert set(checked) <= {"problem_id", "parameter", "ordinal_cnf"}, checked
+    if case.name == "ordinal_zero":
+        assert checked.get("ordinal_cnf") == [], checked
     metadata = resolve_metadata({"problem_id": case.problem, "parameter": "100"}, checked, {"entries": []})
     assert metadata["parameter"] == case.parameter, metadata
     try:
@@ -169,6 +172,8 @@ def main() -> int:
             parser.error(f"Unknown cases: {sorted(unknown)}")
         selected = [case for case in selected if case.name in args.cases]
     modules = sorted({"Challenges." + canonical_module(case.problem) for case in selected})
+    if any(case.problem in ("challenge_6", "challenge_10") for case in selected):
+        modules.append("Mathlib.SetTheory.Ordinal.Notation")
     subprocess.run(["lake", "build", *modules], cwd=project, check=True)
     lean_path = subprocess.check_output(
         ["lake", "env", "printenv", "LEAN_PATH"], cwd=project, text=True).strip()

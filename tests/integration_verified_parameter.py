@@ -12,7 +12,7 @@ from generate_check import parameter_report, render_check
 from verified_metadata import resolve_metadata
 
 FIXTURE = """
-import Mathlib.SetTheory.Ordinal.Arithmetic
+import Mathlib.SetTheory.Ordinal.Notation
 
 namespace Submission
 def r : Nat := 1
@@ -32,7 +32,7 @@ def main() -> None:
     parser.add_argument("--project", type=Path, required=True)
     project = parser.parse_args().project.resolve()
     subprocess.run(["lake", "build", "Challenges.challenge_08",
-                    "Mathlib.SetTheory.Ordinal.Arithmetic"], cwd=project, check=True)
+                    "Mathlib.SetTheory.Ordinal.Notation"], cwd=project, check=True)
     with tempfile.TemporaryDirectory(prefix="verified-parameter-") as tmp:
         root = Path(tmp)
         source = render_check("challenge_8", "Submission.Main", report_parameter=True)

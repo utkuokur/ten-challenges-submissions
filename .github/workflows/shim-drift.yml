@@ -17,14 +17,20 @@ on:
     branches: [main]
     paths:
       - "scripts/generate_check.py"
+      - "scripts/ordinal_report.py"
+      - "scripts/ordinal_parameters.py"
       - "scripts/shim_drift_check.py"
       - "scripts/verified_metadata.py"
+      - "scripts/append_leaderboard.py"
+      - "scripts/record_leaderboard.py"
+      - "scripts/record_queue.py"
       - "scripts/maintenance_consent.py"
       - "scripts/write_metadata.py"
       - "scripts/archive_submission.py"
       - ".github/ISSUE_TEMPLATE/**"
       - "tests/**"
       - ".github/workflows/submission.yml"
+      - ".github/workflows/record.yml"
       - ".github/workflows/shim-drift.yml"
   workflow_dispatch:
   schedule:
@@ -75,6 +81,9 @@ jobs:
 
       - name: Check proof-derived leaderboard parameters
         run: python3 tests/integration_verified_parameter.py --project lean-challenge
+
+      - name: Check standard ordinal normalization
+        run: python3 tests/integration_ordinal_parameters.py --project lean-challenge
 
       - name: Smoke-test accepted and rejected submissions
         run: python3 tests/integration_submission_smoke.py --project lean-challenge
