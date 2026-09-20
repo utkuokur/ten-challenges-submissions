@@ -29,11 +29,11 @@ For every problem id in CHECKS, the script
 2. generates Check.lean from the template (the same `render_check` code
    path CI uses), and
 
-3. runs `lake build` on it. Expected outcome: a build failure whose ONLY
-   error is the axiom gate rejecting `sorryAx` (the canonical theorem is
-   sorry-backed by design). A type error means the template has drifted
-   from the canon. A successful build is impossible and reported as a
-   failure of the axiom gate itself.
+3. runs `lake build` on it. Expected outcome: the axiom gate rejects
+   `sorryAx` (the canonical theorem is sorry-backed by design). For
+   Challenge 2, the data gate must also reject the canonical placeholder
+   `L`. Any other error means the template has drifted from the canon.
+   A successful build is impossible and reported as a gate failure.
 
 Usage (from a checkout of ten-challenges-submissions, with the canonical
 repo checked out next to it)::
@@ -120,13 +120,20 @@ def run_one(project: pathlib.Path, problem_id: str) -> tuple[bool, str]:
             return False, ("build failed with no diagnostic (infrastructure "
                            "problem?); last output:\n"
                            + "\n".join(out.splitlines()[-15:]))
+        expected = ["non-permitted axiom `sorryAx`"]
+        if problem_id == "challenge_2":
+            expected.append("Submission.L must reduce to explicit finite matroid data.")
         bad = [ln for ln in real_errors
-               if "non-permitted axiom `sorryAx`" not in ln]
+               if not any(message in ln for message in expected)]
         if bad:
             return False, ("template drifted from the canonical statement "
                            "(or the mock failed to elaborate):\n"
                            + "\n".join(bad[:10]))
-        return True, "signature matches (sorryAx-only failure, as designed)"
+        missing = [message for message in expected
+                   if not any(message in ln for ln in real_errors)]
+        if missing:
+            return False, "expected rejection missing: " + "; ".join(missing)
+        return True, "signature matches (placeholder gates reject, as designed)"
     finally:
         sub.unlink(missing_ok=True)
         chk.unlink(missing_ok=True)

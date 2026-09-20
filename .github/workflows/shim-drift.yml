@@ -5,7 +5,8 @@ name: Shim drift check
 # places, and they must move in lockstep. This workflow rebuilds every shim
 # against a mock submission that re-exports the canonical (sorry-backed)
 # theorem; a template that drifted fails with a type error, while an in-sync
-# one fails only at the sorryAx axiom gate. See scripts/shim_drift_check.py.
+# one fails at the expected placeholder gates (axioms, and Challenge 2 data).
+# See scripts/shim_drift_check.py.
 #
 # The mirror-image workflow in TenChallenges/ten-challenges runs the same script
 # on every push that touches Challenges/** — that side catches canon edits,

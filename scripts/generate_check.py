@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate Challenges/Check.lean for a given problem_id.
 
-The Check.lean file asserts two things about the submission:
+The Check.lean file checks the following about the submission:
 
 1. *Signature.* `Submission.challenge_N` has the exact canonical type from
    `Challenges/challenge_NN.lean` (with the canonical parameter `r`
@@ -17,6 +17,10 @@ The Check.lean file asserts two things about the submission:
    the textual `sorry`/`axiom` greps (most notably `theorem ... := sorryAx _ _`,
    which the source-level grep `(^|[^[:alnum:]_])sorry([^[:alnum:]_]|$)`
    does not match because `sorryAx` is followed by `A`).
+
+3. *Explicit data (Challenge 2).* `Submission.L` reduces to finite matroid
+   data, including every ground-set and independent-set entry. A list
+   specified only through classical choice does not meet this requirement.
 
 The CLI also exports the checked parameter to `.lake/verified-parameter.json`.
 CI consumes it only after a successful build, replacing the issue's claimed
@@ -327,7 +331,56 @@ set_option linter.hashCommand false in
 """
 
 
-# Consumed only when the entire signature and axiom check builds successfully.
+# Reduce the data using Lean's logical definitions, never compiled evaluation:
+# `implemented_by` must not substitute different contents. Proof fields can
+# use classical reasoning; only the finite data itself must be concrete.
+MATROID_DATA_CHECK = r"""
+
+namespace ExplicitMatroidData
+open Lean Meta Elab Command
+
+private def constructorArgs (e : Expr) (name : Name) (arity : Nat) : MetaM (Array Expr) := do
+  let e ← withTransparency .all (whnf e)
+  unless e.isAppOfArity name arity do
+    throwError "Submission.L must reduce to explicit finite matroid data."
+  return e.getAppArgs
+
+private partial def checkList (checkEntry : Expr → MetaM Unit) (e : Expr) : MetaM Unit := do
+  let e ← withTransparency .all (whnf e)
+  if e.isAppOfArity ``List.nil 1 then
+    return
+  let args ← constructorArgs e ``List.cons 3
+  checkEntry args[1]!
+  checkList checkEntry args[2]!
+
+private def checkFinset (checkEntry : Expr → MetaM Unit) (e : Expr) : MetaM Unit := do
+  let args ← constructorArgs e ``Finset.mk 3
+  let quotient ← constructorArgs args[1]! ``Quot.mk 3
+  checkList checkEntry quotient[2]!
+
+private partial def checkNat (e : Expr) : MetaM Unit := do
+  let e ← withTransparency .all (whnf e)
+  if (getRawNatValue? e).isSome || e.isConstOf ``Nat.zero then return
+  let args ← constructorArgs e ``Nat.succ 1
+  checkNat args[0]!
+
+private def checkMatroid (e : Expr) : MetaM Unit := do
+  let args ← constructorArgs e ``FinMatroid.mk 2
+  checkFinset checkNat args[0]!
+  checkFinset (checkFinset checkNat) args[1]!
+
+elab "#assert_explicit_matroid_data" : command => do
+  liftTermElabM do
+    checkFinset checkMatroid (← mkConstWithFreshMVarLevels `Submission.L)
+
+end ExplicitMatroidData
+
+set_option linter.hashCommand false in
+#assert_explicit_matroid_data
+"""
+
+
+# Consumed only when the entire signature, axiom, and data check succeeds.
 # Natural parameters are reduced, not pretty-printed (e.g. 1 + 2 becomes 3).
 # Ordinals have no general numeric normal form: expand submission definitions
 # and retain the resulting Lean expression, e.g. Ordinal.omega0 + 1.
@@ -408,6 +461,7 @@ def render_check(problem: str, submission_module: str, *, report_parameter: bool
         AXIOM_CHECK_IMPORT
         + template.lstrip("\n")
         + AXIOM_CHECK_TAIL.replace("%N%", str(n))
+        + (MATROID_DATA_CHECK if problem == "challenge_2" else "")
         + (parameter_report(problem, submission_module) if report_parameter else "")
     )
 

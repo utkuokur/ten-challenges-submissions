@@ -17,6 +17,13 @@ extra assumptions, restricted universes, placeholder proofs, and direct or
 indirect dependencies on unapproved axioms. Accepted results also exercise
 parameter extraction and duplicate detection.
 
+The smoke suite also runs Challenge 2's explicit-data gate independently of
+the excluded-minor correctness proof. These data fixtures accept literal and
+computed lists, allow classical reasoning in proof fields, and reject data
+hidden behind choice at every nesting level. They also check that compiled
+implementation overrides cannot replace the logical data. Run just this part
+with `python3 tests/integration_explicit_matroids.py --project ../ten-challenges`.
+
 The fixtures are small boundary cases, not new mathematical results. They
 exercise the local verifier and metadata handling; they do not test GitHub
 authentication, private-repository fetching, encryption, deployment, or

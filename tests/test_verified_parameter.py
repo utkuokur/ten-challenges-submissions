@@ -73,6 +73,17 @@ class VerifiedParameterTests(unittest.TestCase):
                                   capture_output=True)
             self.assertNotEqual(proc.returncode, 0)
 
+    def test_explicit_matroids_required_only_for_challenge_two(self):
+        source = render_check("challenge_2", "Submission.Main", report_parameter=True)
+        self.assertLess(source.index("#assert_canonical_axioms Submission.challenge_2"),
+                        source.index("#assert_explicit_matroid_data"))
+        self.assertLess(source.index("#assert_explicit_matroid_data"),
+                        source.index("#export_verified_parameter"))
+        self.assertIn("#assert_explicit_matroid_data",
+                      render_check("challenge_2", "Submission.Main"))
+        self.assertNotIn("#assert_explicit_matroid_data",
+                         render_check("challenge_8", "Submission.Main"))
+
 
 if __name__ == "__main__":
     unittest.main()
