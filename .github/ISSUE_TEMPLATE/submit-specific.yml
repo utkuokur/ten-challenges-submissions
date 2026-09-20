@@ -17,21 +17,14 @@ body:
         `theorem challenge_N` inside `namespace Submission`), plus any
         helpers as `Submission/<Name>.lean`.
 
-        New to submitting? See the [submission guide on the
-        website](https://tenchallenges.github.io/ten-challenges/#submit) for
-        the expected repo layout and what the CI checks.
-
-        **Keeping your proof private?** Use a **private** GitHub repo and
-        install the [`ten-challenges-bot` GitHub
-        App](https://github.com/apps/ten-challenges-bot) on it so the CI
-        can clone it. Your source is never published: only your
-        leaderboard row is.
+        **For private submissions,** use a **private** GitHub repo and
+        install the `ten-challenges-bot` GitHub App on it so the CI
+        can clone it.
 
   - type: input
     id: repo_url
     attributes:
       label: Repository URL
-      description: HTTPS URL of your GitHub repo — public, or PRIVATE with the [`ten-challenges-bot` App](https://github.com/apps/ten-challenges-bot) installed. CI evaluates the `main` branch.
       placeholder: https://github.com/me/my-proofs
     validations:
       required: true
