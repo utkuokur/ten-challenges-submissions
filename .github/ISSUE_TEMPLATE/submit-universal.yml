@@ -1,6 +1,5 @@
 name: Submit a proof of the universal conjecture
 description: Settle one of the universal (∀r) challenges by proving the conjecture or its negation.
-title: "[submission] "
 labels:
   - submission
 body:

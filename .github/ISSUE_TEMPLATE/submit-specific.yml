@@ -1,6 +1,5 @@
 name: Submit a proof for a specific r
 description: Submit a Lean 4 proof of one challenge at a specific value of the parameter r.
-title: "[submission] "
 labels:
   - submission
 body:
