@@ -80,7 +80,7 @@ body:
       options:
         - label: I understand the CI will shallow-clone the repository above and run `lake build` against the canonical environment.
           required: true
-        - label: I understand my nickname, name, problem, claim, and parameter will be published on the public leaderboard (but not my proof source).
+        - label: I understand my nickname, name, problem, claim, and parameter will be published on the public leaderboard
           required: true
         - label: I understand that an encrypted copy of my submission source is retained indefinitely in a private audit repository, decryptable only by the maintainers listed in `.audit/recipients.txt`, for soundness auditing and compatibility maintenance.
           required: true
