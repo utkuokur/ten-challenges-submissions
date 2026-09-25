@@ -18,7 +18,10 @@ recorder checks out trusted `main`, never the submission or an artifact's code.
 
 For each issue, the recorder reads the current remote leaderboard and checks
 for a duplicate. An existing result for the same issue is a no-op; a different
-issue for the same problem and parameter is rejected. New ranks follow the
+issue for the same problem and parameter is rejected. Challenge 2 records
+pairs `(r, B)`: a new pair is rejected when an earlier entry has `r' >= r` and
+`B' <= B`, since monotonicity already implies it; a new result must raise `r`
+or lower `B` for the same `r`. New ranks follow the
 largest existing rank, including when older entries have been deleted. Private
 repository links are omitted from the public entry.
 

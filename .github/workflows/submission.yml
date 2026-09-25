@@ -114,10 +114,13 @@ jobs:
 
           parameter_raw = normalize(
               extract("Chosen parameter r", required=False))
+          bound = ""
           if parameter_raw:
               scope = "specific"
               parameter = parameter_raw
               claim = "prove"
+              # challenge_2 only: the claimed bound B (verified by the build)
+              bound = normalize(extract("Chosen bound B", required=False))
           else:
               scope = "universal"
               parameter = "universal"
@@ -144,7 +147,7 @@ jobs:
                     "repo_url": repo_url, "repo_ref": repo_ref,
                     "problem_id": problem_id,
                     "module": module, "claim": claim,
-                    "parameter": parameter, "nickname": nickname,
+                    "parameter": parameter, "bound": bound, "nickname": nickname,
                     "name": name, "maintenance_consent": json.dumps(consent)}
           for k, v in single.items():
               v_one = v.replace("\n", " ").replace("\r", "").strip()
@@ -203,6 +206,7 @@ jobs:
           ISSUE: ${{ github.event.issue.number }}
           PROBLEM_ID: ${{ steps.parse.outputs.problem_id }}
           PARAMETER: ${{ steps.parse.outputs.parameter }}
+          BOUND: ${{ steps.parse.outputs.bound }}
           CLAIM: ${{ steps.parse.outputs.claim }}
           NICKNAME: ${{ steps.parse.outputs.nickname }}
           NAME: ${{ steps.parse.outputs.name }}
@@ -547,6 +551,9 @@ jobs:
           sidecar = json.loads(path.read_text())
           sidecar['claimed_parameter'] = sidecar['parameter']
           sidecar['parameter'] = metadata['parameter']
+          if 'bound' in metadata:  # challenge_2: the pair (r, B)
+              sidecar['claimed_bound'] = sidecar.get('bound', '')
+              sidecar['bound'] = metadata['bound']
           path.write_text(json.dumps(sidecar, indent=2) + '\n')
           PY
 

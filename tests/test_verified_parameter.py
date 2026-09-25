@@ -73,16 +73,35 @@ class VerifiedParameterTests(unittest.TestCase):
                                   capture_output=True)
             self.assertNotEqual(proc.returncode, 0)
 
-    def test_explicit_matroids_required_only_for_challenge_two(self):
+    def test_bound_exported_only_for_challenge_two(self):
         source = render_check("challenge_2", "Submission.Main", report_parameter=True)
+        self.assertIn("statement_02 Submission.r Submission.B", source)
         self.assertLess(source.index("#assert_canonical_axioms Submission.challenge_2"),
-                        source.index("#assert_explicit_matroid_data"))
-        self.assertLess(source.index("#assert_explicit_matroid_data"),
                         source.index("#export_verified_parameter"))
-        self.assertIn("#assert_explicit_matroid_data",
-                      render_check("challenge_2", "Submission.Main"))
-        self.assertNotIn("#assert_explicit_matroid_data",
-                         render_check("challenge_8", "Submission.Main"))
+        self.assertIn("`Submission.B", source)
+        self.assertIn('("bound"', source)
+        self.assertNotIn("Submission.B",
+                         render_check("challenge_8", "Submission.Main", report_parameter=True))
+        self.assertNotIn("assert_explicit_matroid_data",
+                         render_check("challenge_2", "Submission.Main"))
+
+    def test_challenge_two_requires_bound_and_rejects_covered_pairs(self):
+        board = {"entries": [{"problem": "challenge_2", "parameter": "5", "bound": "10",
+                              "issue": 7}]}
+        meta = {"problem_id": "challenge_2", "parameter": "5", "bound": "10"}
+        with self.assertRaisesRegex(ValueError, "bound B"):
+            resolve_metadata(meta, {"problem_id": "challenge_2", "parameter": "5"}, board)
+        for r, b in (("5", "10"), ("5", "12"), ("4", "10"), ("4", "99"), ("0", "10")):
+            with self.subTest(r=r, b=b), self.assertRaisesRegex(ValueError, "already covered"):
+                resolve_metadata(meta, {"problem_id": "challenge_2", "parameter": r,
+                                        "bound": b}, board)
+        for r, b in (("5", "9"), ("6", "100"), ("4", "9"), ("05", "0009")):
+            with self.subTest(r=r, b=b):
+                result = resolve_metadata(meta, {"problem_id": "challenge_2", "parameter": r,
+                                                 "bound": b}, board)
+                self.assertEqual((result["parameter"], result["bound"]),
+                                 (r.lstrip("0"), b.lstrip("0")))
+                self.assertEqual(result["claimed_bound"], "10")
 
 
 if __name__ == "__main__":

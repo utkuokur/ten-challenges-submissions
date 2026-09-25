@@ -57,6 +57,15 @@ body:
       required: true
 
   - type: input
+    id: bound
+    attributes:
+      label: Chosen bound B
+      description: Challenge 2 only — the bound `B` on the number of excluded minors your proof establishes (the pair `r`, `B` is recorded).
+      placeholder: e.g. 7
+    validations:
+      required: false
+
+  - type: input
     id: nickname
     attributes:
       label: Nickname

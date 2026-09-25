@@ -10,6 +10,7 @@ Schema matches what the React app at automated_compile/src/App.tsx reads:
           "problem": str,          # e.g. "challenge_1" or "challenge_1_univ"
           "claim": str,            # "prove" | "disprove"
           "parameter": str,        # e.g. "5" or "universal"
+          "bound": str,            # challenge_2 only: the certified bound B
           "date": str,             # ISO-8601 UTC, second precision
           "issue": int,            # issue number on the submissions repo
           "source_url": str,       # public proof URL; "" for private submissions
@@ -18,6 +19,8 @@ Schema matches what the React app at automated_compile/src/App.tsx reads:
 
 Rank follows the largest existing rank. Repeated recording of the same
 issue/result is a no-op; a competing issue cannot take an occupied place.
+Challenge 2 records pairs (r, B): a pair already implied by an earlier entry
+through monotonicity (r' >= r and B' <= B) is rejected as a duplicate.
 """
 from __future__ import annotations
 
@@ -31,6 +34,20 @@ from dataclasses import dataclass
 from ordinal_parameters import display_cnf, parse_cnf
 
 
+BOUNDED_COUNT = "challenge_2"
+
+
+def covers(entry: dict, parameter: str, bound: str) -> bool:
+    """Whether a recorded Challenge 2 entry already implies the pair (r, B).
+
+    The statement is monotone: a proof at (r', B') gives every (r, B) with
+    r <= r' and B >= B'. Such a pair adds nothing and is not recorded."""
+    try:
+        return int(entry["parameter"]) >= int(parameter) and int(entry["bound"]) <= int(bound)
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
 @dataclass(frozen=True)
 class Decision:
     status: str  # added, existing, duplicate, or conflict
@@ -42,14 +59,26 @@ def decide(data: dict, metadata: dict) -> Decision:
     entries = data["entries"]
     if not isinstance(entries, list):
         raise ValueError("Malformed leaderboard: entries must be a list")
-    key = (metadata["problem_id"], metadata["parameter"])
+    problem = metadata["problem_id"]
+    bounded = problem == BOUNDED_COUNT
+    if bounded:
+        bound = metadata.get("bound")
+        if not isinstance(bound, str) or not bound.isdecimal():
+            raise ValueError("Challenge 2 entries need a verified natural-number bound B")
+    key = (problem, metadata["parameter"], metadata.get("bound") if bounded else None)
     for entry in entries:
         if entry["issue"] == metadata["issue"]:
-            same = (entry["problem"], entry["parameter"]) == key
+            same = (entry["problem"], entry["parameter"],
+                    entry.get("bound") if bounded else None) == key
             same = same and entry["claim"] == metadata["claim"]
             return Decision("existing" if same else "conflict", entry)
     for entry in entries:
-        if (entry["problem"], entry["parameter"]) == key:
+        if entry["problem"] != problem:
+            continue
+        if bounded:
+            if covers(entry, metadata["parameter"], metadata["bound"]):
+                return Decision("duplicate", entry)
+        elif entry["parameter"] == metadata["parameter"]:
             return Decision("duplicate", entry)
     public = metadata["submission_public"]
     if not isinstance(public, bool):
@@ -72,6 +101,7 @@ def decide(data: dict, metadata: dict) -> Decision:
         "source_url": metadata.get("source_url", "") if public else "",
         "submission_public": public,
         **ordinal_fields,
+        **({"bound": metadata["bound"]} if bounded else {}),
     })
 
 
@@ -84,6 +114,8 @@ def main() -> int:
     p.add_argument("--problem", required=True)
     p.add_argument("--claim", required=True)
     p.add_argument("--parameter", required=True)
+    p.add_argument("--bound", default=None,
+                   help="challenge_2 only: the verified bound B")
     p.add_argument("--issue", required=True, type=int)
     # Optional: a private submission has no publishable source link, so
     # the leaderboard entry carries an empty source_url for it.
@@ -109,6 +141,7 @@ def main() -> int:
         "problem_id": args.problem,
         "claim": args.claim,
         "parameter": args.parameter,
+        **({"bound": args.bound} if args.bound is not None else {}),
         "issue": args.issue,
         "source_url": args.source_url,
         "submission_public": args.submission_public,

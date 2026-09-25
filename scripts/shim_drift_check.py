@@ -15,12 +15,12 @@ For every problem id in CHECKS, the script
        import Challenges.challenge_NN
        namespace Submission
        def r := _root_.r                       -- parametrized problems only
-       def L := _root_.L                       -- challenge_2 only
+       def B := _root_.B                       -- challenge_2 only
        def challenge_N := @_root_.challenge_N  -- canonical qualified name
        end Submission
 
    The defs carry no type ascriptions, so `Submission.challenge_N` has
-   *exactly* the canonical theorem's type, with `Submission.r` (and `L`)
+   *exactly* the canonical theorem's type, with `Submission.r` (and `B`)
    definitionally equal to the canonical parameters. The `@` keeps Lean from
    eagerly instantiating leading implicit binders. The shim's `example`
    therefore typechecks iff the template's signature agrees with the
@@ -30,9 +30,8 @@ For every problem id in CHECKS, the script
    path CI uses), and
 
 3. runs `lake build` on it. Expected outcome: the axiom gate rejects
-   `sorryAx` (the canonical theorem is sorry-backed by design). For
-   Challenge 2, the data gate must also reject the canonical placeholder
-   `L`. Any other error means the template has drifted from the canon.
+   `sorryAx` (the canonical theorem is sorry-backed by design). Any other
+   error means the template has drifted from the canon.
    A successful build is impossible and reported as a gate failure.
 
 Usage (from a checkout of ten-challenges-submissions, with the canonical
@@ -69,11 +68,10 @@ def mock_defs(problem_id: str) -> list[str]:
         return []
     defs = ["def r := _root_.r"]
     if problem_id == "challenge_2":
-        # challenge_2 solvers also exhibit the excluded-minor list `L`. The
-        # prime-power witnesses `p`/`m` are existentially bound inside the
-        # statement (explicit-list form), so there are no top-level defs to
-        # re-export for them.
-        defs += ["def L := _root_.L"]
+        # challenge_2 solvers also supply the bound `B` on the number of
+        # excluded minors; the prime powers are quantified inside the
+        # statement, so there is nothing else to re-export.
+        defs += ["def B := _root_.B"]
     return defs
 
 
@@ -121,8 +119,6 @@ def run_one(project: pathlib.Path, problem_id: str) -> tuple[bool, str]:
                            "problem?); last output:\n"
                            + "\n".join(out.splitlines()[-15:]))
         expected = ["non-permitted axiom `sorryAx`"]
-        if problem_id == "challenge_2":
-            expected.append("Submission.L must reduce to explicit finite matroid data.")
         bad = [ln for ln in real_errors
                if not any(message in ln for message in expected)]
         if bad:

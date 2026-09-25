@@ -6,7 +6,17 @@ import argparse
 import json
 from pathlib import Path
 
+from append_leaderboard import BOUNDED_COUNT, covers
 from ordinal_parameters import display_cnf, parse_cnf
+
+
+def natural(value: object, what: str) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"The build did not report a verified {what}.")
+    value = " ".join(value.split())
+    if not value.isascii() or not value.isdecimal():
+        raise ValueError(f"The verified {what} must be a natural number.")
+    return value.lstrip("0") or "0"
 
 
 def resolve_metadata(metadata: dict, report: dict, leaderboard: dict) -> dict:
@@ -32,17 +42,31 @@ def resolve_metadata(metadata: dict, report: dict, leaderboard: dict) -> dict:
         if display_cnf(normal) != parameter:
             raise ValueError("The ordinal display does not match its normal form.")
         ordinal_fields["ordinal_cnf"] = report["ordinal_cnf"]
-    for entry in leaderboard.get("entries", []):
-        if entry.get("problem") == problem and entry.get("parameter") == parameter:
-            raise ValueError(
-                f"Challenge {problem} at r = {parameter} has already been settled "
-                f"by issue #{entry.get('issue', '?')}."
-            )
+    bound_fields = {}
+    if problem == BOUNDED_COUNT:
+        bound = natural(report.get("bound"), "bound B")
+        for entry in leaderboard.get("entries", []):
+            if entry.get("problem") == problem and covers(entry, parameter, bound):
+                raise ValueError(
+                    f"Challenge {problem} at r = {parameter} with B = {bound} is already "
+                    f"covered by issue #{entry.get('issue', '?')} (r = {entry.get('parameter')}, "
+                    f"B = {entry.get('bound')}): a new result must raise r, or lower B "
+                    f"for the same r."
+                )
+        bound_fields = {"claimed_bound": metadata.get("bound", ""), "bound": bound}
+    else:
+        for entry in leaderboard.get("entries", []):
+            if entry.get("problem") == problem and entry.get("parameter") == parameter:
+                raise ValueError(
+                    f"Challenge {problem} at r = {parameter} has already been settled "
+                    f"by issue #{entry.get('issue', '?')}."
+                )
     result = {**metadata, "claimed_parameter": metadata["parameter"], "parameter": parameter}
     # Only the checked report can supply a comparison key. Do not retain a
     # claimed/stale key from the issue metadata when normalization is absent.
     result.pop("ordinal_cnf", None)
-    return {**result, **ordinal_fields}
+    result.pop("bound", None)
+    return {**result, **ordinal_fields, **bound_fields}
 
 
 def main() -> None:

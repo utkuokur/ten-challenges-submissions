@@ -18,9 +18,9 @@ The Check.lean file checks the following about the submission:
    which the source-level grep `(^|[^[:alnum:]_])sorry([^[:alnum:]_]|$)`
    does not match because `sorryAx` is followed by `A`).
 
-3. *Explicit data (Challenge 2).* `Submission.L` reduces to finite matroid
-   data, including every ground-set and independent-set entry. A list
-   specified only through classical choice does not meet this requirement.
+3. *Bound (Challenge 2).* `Submission.B`, the certified bound on the number
+   of excluded minors, reduces to a concrete natural number and is exported
+   next to `r`; the leaderboard records the pair `(r, B)`.
 
 The CLI also exports the checked parameter to `.lake/verified-parameter.json`.
 CI consumes it only after a successful build, replacing the issue's claimed
@@ -64,9 +64,7 @@ example : statement_01 Submission.r :=
 import Challenges.challenge_02
 import Challenges.Submission
 
-universe u
-
-example : statement_02.{u} Submission.r Submission.L :=
+example : statement_02 Submission.r Submission.B :=
   Submission.challenge_2
 """,
     "challenge_3": r"""
@@ -141,7 +139,7 @@ example : ∀ r : ℕ, statement_01 r :=
   Submission.challenge_1
 """,
     # challenge_2 has no _univ slot: its universal form is the
-    # Geelen–Gerards–Whittle THEOREM, and the explicit-list challenge is the
+    # Geelen–Gerards–Whittle THEOREM, and the bounded-count challenge is the
     # single (parametrized) statement.
     "challenge_3_univ": r"""
 import Challenges.challenge_03_univ
@@ -333,59 +331,11 @@ set_option linter.hashCommand false in
 """
 
 
-# Reduce the data using Lean's logical definitions, never compiled evaluation:
-# `implemented_by` must not substitute different contents. Proof fields can
-# use classical reasoning; only the finite data itself must be concrete.
-MATROID_DATA_CHECK = r"""
-
-namespace ExplicitMatroidData
-open Lean Meta Elab Command
-
-private def constructorArgs (e : Expr) (name : Name) (arity : Nat) : MetaM (Array Expr) := do
-  let e ← withTransparency .all (whnf e)
-  unless e.isAppOfArity name arity do
-    throwError "Submission.L must reduce to explicit finite matroid data."
-  return e.getAppArgs
-
-private partial def checkList (checkEntry : Expr → MetaM Unit) (e : Expr) : MetaM Unit := do
-  let e ← withTransparency .all (whnf e)
-  if e.isAppOfArity ``List.nil 1 then
-    return
-  let args ← constructorArgs e ``List.cons 3
-  checkEntry args[1]!
-  checkList checkEntry args[2]!
-
-private def checkFinset (checkEntry : Expr → MetaM Unit) (e : Expr) : MetaM Unit := do
-  let args ← constructorArgs e ``Finset.mk 3
-  let quotient ← constructorArgs args[1]! ``Quot.mk 3
-  checkList checkEntry quotient[2]!
-
-private partial def checkNat (e : Expr) : MetaM Unit := do
-  let e ← withTransparency .all (whnf e)
-  if (getRawNatValue? e).isSome || e.isConstOf ``Nat.zero then return
-  let args ← constructorArgs e ``Nat.succ 1
-  checkNat args[0]!
-
-private def checkMatroid (e : Expr) : MetaM Unit := do
-  let args ← constructorArgs e ``FinMatroid.mk 2
-  checkFinset checkNat args[0]!
-  checkFinset (checkFinset checkNat) args[1]!
-
-elab "#assert_explicit_matroid_data" : command => do
-  liftTermElabM do
-    checkFinset checkMatroid (← mkConstWithFreshMVarLevels `Submission.L)
-
-end ExplicitMatroidData
-
-set_option linter.hashCommand false in
-#assert_explicit_matroid_data
-"""
-
-
 # Consumed only when the entire signature, axiom, and data check succeeds.
 # Natural parameters are reduced, not pretty-printed (e.g. 1 + 2 becomes 3).
-# Challenges 6 and 10 use the separate standard-ordinal reporter. The generic
-# fallback below only prints a non-natural parameter without interpreting it.
+# Challenges 6 and 10 use the separate standard-ordinal reporter, and
+# Challenge 2 the pair reporter below it. The generic fallback only prints a
+# non-natural parameter without interpreting it.
 PARAMETER_REPORT = r"""
 
 open Lean Meta Elab Command in
@@ -417,6 +367,31 @@ set_option linter.hashCommand false in
 """
 
 
+# Challenge 2 submits a pair: the parameter `r` and the bound `B` on the
+# number of excluded minors. Both must reduce to natural-number literals.
+BOUND_PARAMETER_REPORT = r"""
+
+open Lean Meta Elab Command in
+elab "#export_verified_parameter" : command => do
+  let (parameter, bound) ← liftTermElabM do
+    let natValue (name : Name) : TermElabM String := do
+      let e ← mkConstWithFreshMVarLevels name
+      unless (← whnf (← inferType e)).isConstOf ``Nat do
+        throwError m!"{name} must be a natural number."
+      let some n ← getNatValue? (← withTransparency .all (whnf e))
+        | throwError m!"{name} must reduce to a concrete natural number for the leaderboard."
+      return toString n
+    return (← natValue `Submission.r, ← natValue `Submission.B)
+  IO.FS.writeFile ".lake/verified-parameter.json" <|
+    (Json.mkObj [("problem_id", Json.str %PROBLEM%),
+                 ("parameter", Json.str parameter),
+                 ("bound", Json.str bound)]).compress
+
+set_option linter.hashCommand false in
+#export_verified_parameter
+"""
+
+
 def parameter_report(problem: str, submission_module: str) -> str:
     if problem.endswith(("_univ", "_disprove")):
         report = json.dumps({"problem_id": problem, "parameter": "universal"})
@@ -424,7 +399,12 @@ def parameter_report(problem: str, submission_module: str) -> str:
             '  IO.FS.writeFile ".lake/verified-parameter.json" '
             + json.dumps(report) + '\n'
         )
-    template = ORDINAL_PARAMETER_REPORT if problem in ("challenge_6", "challenge_10") else PARAMETER_REPORT
+    if problem in ("challenge_6", "challenge_10"):
+        template = ORDINAL_PARAMETER_REPORT
+    elif problem == "challenge_2":
+        template = BOUND_PARAMETER_REPORT
+    else:
+        template = PARAMETER_REPORT
     return template.replace("%MODULE%", submission_module).replace(
         "%PROBLEM%", json.dumps(problem)
     )
@@ -466,7 +446,6 @@ def render_check(problem: str, submission_module: str, *, report_parameter: bool
            if report_parameter and problem in ("challenge_6", "challenge_10") else "")
         + template.lstrip("\n")
         + AXIOM_CHECK_TAIL.replace("%N%", str(n))
-        + (MATROID_DATA_CHECK if problem == "challenge_2" else "")
         + (parameter_report(problem, submission_module) if report_parameter else "")
     )
 

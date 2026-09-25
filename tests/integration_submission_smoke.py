@@ -24,7 +24,6 @@ sys.path.insert(0, str(SCRIPTS))
 from generate_check import render_check
 from shim_drift_check import canonical_module
 from verified_metadata import resolve_metadata
-from integration_explicit_matroids import run_checks as run_matroid_data_checks
 
 FIXTURES = Path(__file__).parent / "fixtures" / "submission_smoke"
 RYSER = (FIXTURES / "ryser_one.lean").read_text()
@@ -190,8 +189,6 @@ def main() -> int:
             else:
                 outcome = "rejected" if case.rejection else f"accepted with r={case.parameter}"
                 print(f"PASS {case.name}: {outcome}", flush=True)
-    if not args.cases:
-        run_matroid_data_checks(project)
     assert board.read_bytes() == before, "The real leaderboard changed during smoke tests"
     print(f"{len(selected) - len(failures)}/{len(selected)} smoke tests passed; leaderboard unchanged.")
     return bool(failures)

@@ -25,6 +25,25 @@ def metadata(number=1, problem="challenge_8", parameter="3", public=False):
             "submission_public": public, "source_url": "https://github.com/private/proof"}
 
 
+class BoundedCountTests(unittest.TestCase):
+    def test_challenge_two_records_bound_and_rejects_covered_pairs(self):
+        first = {**metadata(1, "challenge_2", "5"), "bound": "10"}
+        board = {"entries": [decide({"entries": []}, first).entry]}
+        self.assertEqual(board["entries"][0]["bound"], "10")
+        for r, b in (("5", "10"), ("5", "12"), ("4", "10")):
+            later = {**metadata(2, "challenge_2", r), "bound": b}
+            self.assertEqual(decide(board, later).status, "duplicate", (r, b))
+        for r, b in (("5", "9"), ("6", "100"), ("4", "9")):
+            later = {**metadata(2, "challenge_2", r), "bound": b}
+            self.assertEqual(decide(board, later).status, "added", (r, b))
+            self.assertEqual(decide(board, later).entry["bound"], b)
+        self.assertEqual(decide(board, first).status, "existing")
+        self.assertEqual(decide(board, {**first, "bound": "9"}).status, "conflict")
+        with self.assertRaises(ValueError):
+            decide(board, metadata(3, "challenge_2", "7"))
+        self.assertEqual(decide(board, metadata(3, "challenge_8", "5")).status, "added")
+
+
 class LocalGitTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

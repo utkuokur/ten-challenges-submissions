@@ -4,7 +4,7 @@
 Usage:
     write_metadata.py <output-path>
 
-Reads ISSUE, PROBLEM_ID, PARAMETER, CLAIM, NICKNAME, NAME, MODULE,
+Reads ISSUE, PROBLEM_ID, PARAMETER, BOUND (optional), CLAIM, NICKNAME, NAME, MODULE,
 REPO_URL, REPO_REF, SUBMISSION_KIND, SUBMISSION_REPO, SUBMISSION_REF,
 SUBMISSION_PUBLIC from the environment and serializes them to JSON.
 MAINTENANCE_CONSENT optionally contains the captured permission as JSON.
@@ -45,6 +45,8 @@ def main(argv):
         "submission_public": os.environ["SUBMISSION_PUBLIC"] == "true",
         "source_url": src,
     }
+    if bound := os.environ.get("BOUND"):
+        data["bound"] = bound  # challenge_2 only: the claimed bound B
     if consent := os.environ.get("MAINTENANCE_CONSENT"):
         data["maintenance_consent"] = json.loads(consent)
     with open(out_path, "w", encoding="utf-8") as fh:

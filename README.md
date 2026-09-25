@@ -83,10 +83,13 @@ What is and isn't visible:
 
 Once any submission has settled a given (problem, r) pair, later
 submissions for the same pair are rejected — both directions are
-mathematically closed at that point. Results are recorded in issue-opening
+mathematically closed at that point. Challenge 2 records pairs `(r, B)`
+instead: a new result is accepted only if no earlier entry has `r' ≥ r` and
+`B' ≤ B`, i.e. it must raise `r` or lower `B` for the same `r` (the statement
+is monotone in both). Results are recorded in issue-opening
 order. Each challenge tab displays larger natural numbers or recognized
-ordinals first; other ordinals remain unranked pending comparison. The overall
-list retains recording order.
+ordinals first (Challenge 2: larger `r`, then smaller `B`); other ordinals
+remain unranked pending comparison. The overall list retains recording order.
 If recording fails, the issue is closed; check the leaderboard and
 open a new issue if your result is missing. Reopening an old issue does not
 start another evaluation.
@@ -139,6 +142,7 @@ age-encrypted copy of every evaluated submission is pushed to the private
       "problem": "challenge_1",  // or "challenge_1_univ" etc
       "claim": "prove",          // or "disprove"
       "parameter": "5",          // or "universal" for ∀r challenges
+      "bound": "7",              // challenge_2 only: the certified bound B
       "date": "2026-05-30T12:34:56Z",
       "issue": 42,
       "source_url": "https://github.com/me/my-proofs/tree/main",
