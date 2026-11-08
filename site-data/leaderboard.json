@@ -72,6 +72,18 @@
       "issue": 22,
       "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
       "submission_public": true
+    },
+    {
+      "rank": 7,
+      "nickname": "kmehltretter82",
+      "name": "",
+      "problem": "challenge_8",
+      "claim": "prove",
+      "parameter": "2",
+      "date": "2026-11-08T23:16:16Z",
+      "issue": 23,
+      "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
+      "submission_public": true
     }
   ]
 }
