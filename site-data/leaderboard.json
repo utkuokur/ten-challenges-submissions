@@ -96,6 +96,24 @@
       "issue": 24,
       "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
       "submission_public": true
+    },
+    {
+      "rank": 9,
+      "nickname": "kmehltretter82",
+      "name": "",
+      "problem": "challenge_10",
+      "claim": "prove",
+      "parameter": "3",
+      "date": "2026-11-08T23:17:01Z",
+      "issue": 25,
+      "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
+      "submission_public": true,
+      "ordinal_cnf": [
+        [
+          [],
+          "3"
+        ]
+      ]
     }
   ]
 }
