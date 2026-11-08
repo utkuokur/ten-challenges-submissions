@@ -1,3 +1,16 @@
 {
-  "entries": []
+  "entries": [
+    {
+      "rank": 1,
+      "nickname": "kmehltretter82",
+      "name": "",
+      "problem": "challenge_1",
+      "claim": "prove",
+      "parameter": "3",
+      "date": "2026-11-08T23:15:19Z",
+      "issue": 17,
+      "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
+      "submission_public": true
+    }
+  ]
 }
