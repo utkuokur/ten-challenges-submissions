@@ -132,6 +132,24 @@
           "4"
         ]
       ]
+    },
+    {
+      "rank": 11,
+      "nickname": "kmehltretter82",
+      "name": "",
+      "problem": "challenge_10",
+      "claim": "prove",
+      "parameter": "5",
+      "date": "2026-11-12T02:46:46Z",
+      "issue": 27,
+      "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
+      "submission_public": true,
+      "ordinal_cnf": [
+        [
+          [],
+          "5"
+        ]
+      ]
     }
   ]
 }
