@@ -150,6 +150,18 @@
           "5"
         ]
       ]
+    },
+    {
+      "rank": 12,
+      "nickname": "kmehltretter82",
+      "name": "",
+      "problem": "challenge_5",
+      "claim": "prove",
+      "parameter": "4",
+      "date": "2026-11-12T03:09:32Z",
+      "issue": 28,
+      "source_url": "https://github.com/kmehltretter82/ten-challenges-proofs/tree/main",
+      "submission_public": true
     }
   ]
 }
